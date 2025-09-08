@@ -19,3 +19,23 @@ class Nodes:
 
         return {"emails": emails}
         
+    def is_email_inbox_empty(self, state: GraphState) -> GraphState:
+        """
+        Check if the email inbox is empty.
+        """
+        return state
+    
+
+    def categorize_email(self, state: GraphState) -> GraphState:
+        """
+        调用分类agent对邮件进行分类
+        """
+        print(Fore.BLUE + "正在分类邮件...\n" + Style.RESET_ALL)
+        current_email = state["emails"][-1] 
+        result = self.agents.categorize_email.invoke({"email": current_email.body})
+        print(Fore.MAGENTA + f"Email category: {result.category.value}" + Style.RESET_ALL)
+
+        return {
+            "email_category": result.category.value,
+            "current_email": current_email
+        }

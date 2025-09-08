@@ -9,7 +9,8 @@ class GraphWorkFlow:
         nodes = Nodes()
 
         workflow.add_node("load_inbox_emails", nodes.load_new_emails)
-
+        workflow.add_node("is_email_inbox_empty", nodes.is_email_inbox_empty)   # todo
+        workflow.add_node("categorize_email", nodes.categorize_email)
 
         workflow.set_entry_point("load_inbox_emails")
         workflow.add_edge("load_inbox_emails", END)
