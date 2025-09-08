@@ -1,0 +1,29 @@
+from langgraph.graph import StateGraph,END
+
+from src.state import GraphState
+from src.nodes import Nodes
+
+class GraphWorkFlow:
+    def __init__(self):
+        workflow = StateGraph(GraphState)
+        nodes = Nodes()
+
+        workflow.add_node("load_inbox_emails", nodes.load_new_emails)
+
+
+        workflow.set_entry_point("load_inbox_emails")
+        workflow.add_edge("load_inbox_emails", END)
+
+
+        self.graph = workflow.compile()
+
+    
+    def display(self, path: str):
+        try:
+            image_data = self.graph.get_graph().draw_mermaid_png()
+
+            with open(path, "wb") as f:
+                f.write(image_data)
+            print(f"流程图已成功保存为 {path}")
+        except Exception as e:
+            print(f"保存流程图时出错: {e}")
