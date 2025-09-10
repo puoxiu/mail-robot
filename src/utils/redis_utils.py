@@ -17,9 +17,7 @@ def get_redis_conn():
                 db=int(os.getenv("REDIS_DB", 0))
             )
             get_redis_conn.conn.ping()
-            print(f"{Fore.GREEN}✅ Redis连接成功{Style.RESET_ALL}")
         except Exception as e:
-            print(f"{Fore.RED}❌ Redis连接失败: {str(e)}{Style.RESET_ALL}")
             get_redis_conn.conn = None 
     return get_redis_conn.conn
 

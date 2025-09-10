@@ -1,0 +1,14 @@
+# docker-compose.yml（开发环境专用，无持久化）
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest  # 最新稳定版 Redis
+    container_name: mail-robot-redis-dev  # 加 dev 后缀，区分开发/生产容器
+    restart: on-failure  # 仅容器故障时重启（开发阶段无需开机自启）
+    ports:
+      - "6379:6379"  # 端口映射不变，确保和 QQMailTools 配置一致
+    environment:
+      - REDIS_PASSWORD=  # 开发阶段无需密码，保持和代码配置一致
+    # 关键：不挂载数据卷，不开启 AOF 持久化（用默认的内存存储）
+    command: redis-server --appendonly no  # 关闭 AOF 持久化

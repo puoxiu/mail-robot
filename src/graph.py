@@ -4,16 +4,20 @@ from src.state import GraphState
 from src.nodes import Nodes
 
 class GraphWorkFlow:
-    def __init__(self):
+    def __init__(self, model_name: str, base_url: str, api_key: str):
         workflow = StateGraph(GraphState)
-        nodes = Nodes()
+        nodes = Nodes(model_name, base_url, api_key)
 
         workflow.add_node("load_inbox_emails", nodes.load_new_emails)
         workflow.add_node("is_email_inbox_empty", nodes.is_email_inbox_empty)   # todo
         workflow.add_node("categorize_email", nodes.categorize_email)
+        
 
         workflow.set_entry_point("load_inbox_emails")
-        workflow.add_edge("load_inbox_emails", END)
+        
+        workflow.add_edge("load_inbox_emails", "is_email_inbox_empty")
+        workflow.add_edge("is_email_inbox_empty", "categorize_email")
+        workflow.add_edge("categorize_email", END)
 
 
         self.graph = workflow.compile()

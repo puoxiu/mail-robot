@@ -69,13 +69,12 @@ class QQMailTools:
             mail.select("inbox")
 
             # 搜索最近 N 小时内的未读邮件
-            search_criteria = f'(UNSEEN SINCE "{since_str}" FROM NOT "{self.email_account}")'
+            search_criteria = f'(UNSEEN SINCE "{since_str}")'
             status, data = mail.search(None, search_criteria)
             if status != "OK":
                 print(f"{Fore.RED} 搜索邮件失败 {Style.RESET_ALL}")
                 return []
             email_ids = data[0].split()
-            print(f"{Fore.GREEN} 找到 {len(email_ids)} 封未读邮件 {Style.RESET_ALL}")
 
             unanswered_emails = []
             for eid in email_ids[:max_results]:
@@ -306,7 +305,29 @@ class QQMailTools:
         msg.attach(MIMEText(html_content, "html", "utf-8"))
         return msg
 
+    def _get_email_body(self, msg):
+        """
+        提取正文（优先 text/plain，其次 text/html）
+        """
+        body = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                if content_type == "text/plain":
+                    body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                    break
+                elif content_type == "text/html":
+                    body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+        else:
+            body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
 
+        return self._clean_body_text(body)
+
+    def _clean_body_text(self, text):
+        """
+        清理正文文本
+        """
+        return re.sub(r"\s+", " ", text).strip()
 
     def _get_redis_key(self, email_id: str) -> str:
         """
