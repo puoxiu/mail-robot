@@ -16,8 +16,10 @@ class GraphWorkFlow:
         
         workflow.add_node("construct_rag_queries", nodes.construct_rag_queries)
         workflow.add_node("email_writer", nodes.write_email)
-        
-        
+        workflow.add_node("email_proofreader", nodes.verify_generated_email)
+        workflow.add_node("send_email", nodes.send_email)
+        workflow.add_node("manual_pending", nodes.manual_pending)
+
         workflow.set_entry_point("load_inbox_emails")
         workflow.add_edge("load_inbox_emails", "is_email_inbox_empty")
         workflow.add_edge("is_email_inbox_empty", "categorize_email")
@@ -31,8 +33,19 @@ class GraphWorkFlow:
                 "unrelated": END,
             },
         )
-
         workflow.add_edge("construct_rag_queries", "email_writer")
+        workflow.add_edge("email_writer", "email_proofreader")
+        workflow.add_conditional_edges(
+            "email_proofreader",
+            edges.is_email_sendable,
+            {
+                "send": "send_email",
+                "rewrite": "email_writer",
+                "stop": "manual_pending"
+            },
+        )
+
+
         workflow.add_edge("email_writer", END)
 
 

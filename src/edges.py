@@ -16,3 +16,22 @@ class Edges:
             return "complaint_or_feedback"
         else:
             return "unrelated"
+
+    def is_email_sendable(self, state: GraphState) -> str:
+        """
+        路由函数，根据邮件是否可发送路由到不同的节点
+        """
+        email_sendable = state["sendable"]
+        if email_sendable:
+            print(Fore.GREEN + "不需要重写，直接发送" + Style.RESET_ALL)
+            state["emails"].pop()
+            state["writer_messages"] = []
+            return "send"
+        elif state["trials"] >= 3:
+            print(Fore.RED + "超过最大重试次数，必须停止" + Style.RESET_ALL)
+            state["emails"].pop()
+            state["writer_messages"] = []
+            return "stop"
+        else:
+            print(Fore.RED + "需要重写" + Style.RESET_ALL)
+            return "rewrite"

@@ -92,3 +92,44 @@ class Nodes:
             "trials": trials,
             "writer_messages": history_messages
         }
+    
+
+    def verify_generated_email(self, state: GraphState) -> GraphState:
+        """
+        调用邮件agent校对邮件
+        """
+        print(Fore.BLUE + "正在校对邮件...\n" + Style.RESET_ALL)
+        review = self.agents.email_proofreader_chain().invoke({
+            "initial_email": state["current_email"].body,
+            "generated_email": state["generated_email"],
+        })
+        writer_messages = state.get('writer_messages', [])
+        writer_messages.append(f"# 校对结果：\n{review.reason}")
+
+        return {
+            "sendable": review.sendable,
+            "writer_messages": writer_messages
+        }
+    
+
+    def send_email(self, state: GraphState) -> GraphState:
+        """
+        发送邮件
+        """
+        print(Fore.BLUE + "正在发送邮件...\n" + Style.RESET_ALL)
+        print(Fore.MAGENTA + f"nodes info: 原始邮件内容: {state['current_email']}" + Style.RESET_ALL)
+        print(Fore.MAGENTA + f"nodes info: 发送邮件内容: {state['generated_email']}" + Style.RESET_ALL)
+        self.qq_mail_tools.send_reply(
+            state["current_email"],
+            state["generated_email"]
+        )
+        return {"retrieved_documents": "", "trials": 0}
+    
+
+    def manual_pending(self, state: GraphState) -> GraphState:
+        """
+        手动处理邮件
+        """
+        print(Fore.BLUE + "正在手动处理邮件...\n" + Style.RESET_ALL)
+        print(Fore.MAGENTA + f"{state}" + Style.RESET_ALL)
+        return state

@@ -9,8 +9,9 @@ from .prompts_zh import (
     CATEGORIZE_EMAIL_PROMPT,
     GENERATE_RAG_QUERIES_PROMPT,
     EMAIL_WRITER_PROMPT,
+    EMAIL_PROOFREADER_PROMPT,
 )
-from .schema_outputs import CategorizeEmailOutput, RAGQueriesOutput, EmailWriterOutput
+from .schema_outputs import CategorizeEmailOutput, RAGQueriesOutput, EmailWriterOutput, EmailProofreaderOutput
 
 class Agents:
     def __init__(self, model_name: str, base_url: str, api_key: str):
@@ -50,3 +51,10 @@ class Agents:
             input_variables=["email_information", "history"], 
         )
         return writer_prompt | self.model2.with_structured_output(EmailWriterOutput)
+
+    def email_proofreader_chain(self) -> RunnablePassthrough:
+        proofreader_prompt = PromptTemplate(
+            template=EMAIL_PROOFREADER_PROMPT,
+            input_variables=["initial_email", "generated_email"],
+        )
+        return proofreader_prompt | self.model2.with_structured_output(EmailProofreaderOutput)

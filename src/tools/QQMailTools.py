@@ -14,11 +14,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.utils.redis_utils import redis_conn
-
+from .schema_mail import Email
 
 class EmailStatus(Enum):
     UNPROCESSED = ("unprocessed", "新读取的邮件，未处理")
-    CATEGORIZED = ("categorized", "已分类的邮件（待后续处理）")
     AUTO_REPLIED = ("auto_replied", "已自动回复的邮件") 
     MANUAL_PENDING = ("manual_pending", "需人工处理，暂存待介入")
     MANUAL_REPLIED = ("manual_replied", "已人工处理并回复的邮件")
@@ -83,9 +82,8 @@ class QQMailTools:
                 # 判重逻辑：排除非「UNPROCESSED」状态的邮件
                 if self.redis_conn and self.redis_conn.exists(redis_key):
                     existing_status = self.redis_conn.hget(redis_key, "status")
-                    # 非未处理状态列表（包含其他5种状态）
+                    # 非未处理状态列表（包含其他4种状态）
                     non_unprocessed_status = [
-                        EmailStatus.CATEGORIZED.status_value,
                         EmailStatus.AUTO_REPLIED.status_value,
                         EmailStatus.MANUAL_PENDING.status_value,
                         EmailStatus.MANUAL_REPLIED.status_value,
@@ -136,24 +134,25 @@ class QQMailTools:
             print(f"{Fore.RED} 获取邮件失败: {e} {Style.RESET_ALL}")
             return []
         
-    def send_reply(self, initial_email, reply_text):
+    def send_reply(self, initial_email: Email, reply_text: str):
         """
         发送回复邮件, 并更新状态为 AUTO_REPLIED
         """
         try:
             # 1. 校验原始邮件信息
-            if not initial_email.get("id") or not initial_email.get("sender"):
+            if not initial_email.id or not initial_email.sender:
                 print(f"{Fore.RED} 原始邮件信息不完整缺少id或sender {Style.RESET_ALL}")
                 return None
             
+            # 2. 创建回复邮件
             reply_msg = self._create_reply_message(initial_email, reply_text, send=True)
             # 优化发件人显示（如“自动回复 <xxx@qq.com>”）
-            reply_msg["From"] = f"AI回复 <{self.email_account}>"
+            reply_msg["From"] = f'"AI Reply" <{self.email_account}>'
 
             server = smtplib.SMTP_SSL(self.smtp_host, self.smtp_port)
             
             server.login(self.email_account, self.email_password)
-            server.sendmail(self.email_account, initial_email["sender"], reply_msg.as_string())
+            server.sendmail(self.email_account, initial_email.sender, reply_msg.as_string())
             server.quit()
 
             # 4. 发送成功：更新状态为 AUTO_REPLIED
@@ -163,26 +162,24 @@ class QQMailTools:
                 "reply_message_id": reply_msg["Message-ID"],  # 回复邮件的ID
                 "updated_by": "system"                    # 操作人（系统自动回复）
             }
-            self._update_email_status(initial_email, status=EmailStatus.AUTO_REPLIED, extra_data=extra_data)
-
+            # 开发阶段 先不更新状态
+            # self._update_email_status(initial_email, status=EmailStatus.AUTO_REPLIED, extra_data=extra_data)
 
             return {
                 "status": "sent",
-                "to": initial_email["sender"],
-                "original_email_id": initial_email["id"],
+                "to": initial_email.sender,
+                "original_email_id": initial_email.id,
                 "reply_message_id": reply_msg["Message-ID"]
             }
         except Exception as e:
             error_msg = f"发送失败：{str(e)}"
-            print(f"{Fore.RED}❌ {error_msg} | 原始邮件ID：{initial_email.get('id', '未知')}{Style.RESET_ALL}")
+            print(f"{Fore.RED}❌ {error_msg} | 原始邮件ID：{initial_email.id}{Style.RESET_ALL}")
             return None
         
     def update_email_category(self, email_id: str, category: str):
         """
         邮件分类后，更新状态为「CATEGORIZED」（已分类）
         :param email_id: 邮件ID（从fetch_unanswered_emails获取）
-        :param category: 分类结果（如"support"售后、"inquiry"咨询、"marketing"营销）
-        :param operator: 操作人（默认system，人工分类填用户名）
         :return: 成功True，失败False
         """
         # 1. 校验参数
@@ -279,18 +276,18 @@ class QQMailTools:
         self._update_email_status(email_info, status=EmailStatus.IGNORED, extra_data=extra_data)
         return True
 
-    def _create_reply_message(self, email_info, reply_text, send=False):
+    def _create_reply_message(self, initial_email: Email, reply_text: str, send=False):
         """
         构造 HTML 回复邮件
         """
         msg = MIMEMultipart("alternative")
-        msg["From"] = self.email_account
-        msg["To"] = email_info["sender"]
-        msg["Subject"] = f"Re: {email_info['subject']}" if not email_info["subject"].startswith("Re:") else email_info["subject"]
+        # msg["From"] = self.email_account
+        msg["To"] = initial_email.sender
+        msg["Subject"] = f"Re: {initial_email.subject}" if not initial_email.subject.startswith("Re:") else initial_email.subject
 
-        if email_info.get("messageId"):
-            msg["In-Reply-To"] = email_info["messageId"]
-            msg["References"] = f"{email_info.get('references', '')} {email_info['messageId']}".strip()
+        if initial_email.messageId:
+            msg["In-Reply-To"] = initial_email.messageId
+            msg["References"] = f"{initial_email.references} {initial_email.messageId}".strip()
         if send:
             msg["Message-ID"] = f"<{uuid.uuid4()}@qq.com>"
 

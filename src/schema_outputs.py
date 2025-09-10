@@ -28,3 +28,14 @@ class EmailWriterOutput(BaseModel):
         ..., 
         description="The final email content, formatted as a string, ready to be sent to the customer."
     )
+
+
+class EmailProofreaderOutput(BaseModel):
+    reason: str = Field(
+        ..., 
+        description="Detailed reason why the email is or is not sendable."
+    )
+    sendable: bool = Field(
+        ..., 
+        description="Indicates whether the email is sendable (true) or not (false)."
+    )
