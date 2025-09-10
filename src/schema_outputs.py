@@ -15,3 +15,16 @@ class CategorizeEmailOutput(BaseModel):
         ..., 
         description="The category assigned to the email, indicating its type based on predefined rules."
     )
+
+
+class RAGQueriesOutput(BaseModel):
+    queries: List[str] = Field(
+        ..., 
+        description="A list of up to three questions representing the customer's intent, based on their email."
+    )
+
+class EmailWriterOutput(BaseModel):
+    content: str = Field(
+        ..., 
+        description="The final email content, formatted as a string, ready to be sent to the customer."
+    )

@@ -34,9 +34,61 @@ class Nodes:
         print(Fore.BLUE + "正在分类邮件...\n" + Style.RESET_ALL)
         current_email = state["emails"][-1] 
         result = self.agents.categorize_email_chain().invoke({"email_content": current_email.body})
-        print(Fore.MAGENTA + f"分类结果Email category: {result.category.value}" + Style.RESET_ALL)
+        print(Fore.MAGENTA + f"nodes info: 分类结果Email category: {result.category.value}" + Style.RESET_ALL)
 
         return {
             "email_category": result.category.value,
             "current_email": current_email
+        }
+    
+
+    def construct_rag_queries(self, state: GraphState) -> GraphState:
+        """
+        调用RAG agent构造RAG查询
+        """
+        print(Fore.BLUE + "正在构造RAG查询...\n" + Style.RESET_ALL)
+        email_content = state["current_email"].body
+        query_result = self.agents.design_rag_queries_chain().invoke({"email_content": email_content})
+
+        for query in query_result.queries:
+            print(Fore.MAGENTA + f"nodes info: 构造RAG查询: {query}" + Style.RESET_ALL)
+        
+        return {
+            "rag_queries": query_result.queries
+        }
+        
+    
+    def write_email(self, state: GraphState) -> GraphState:
+        """
+        调用邮件agent编写邮件
+        """
+        print(Fore.BLUE + "正在编写邮件...\n" + Style.RESET_ALL)
+
+        # 1. 从state中获取所需信息（确保前置节点已存入这些数据）
+        current_email = state.get("current_email")  # 当前处理的客户邮件
+        email_category = state.get("email_category")  # 邮件分类结果
+        rag_queries = state.get("rag_queries", [])  # RAG查询结果（可选，为空不影响）
+        history_messages = state.get("writer_messages", [])  # 历史编写记录
+        trials = state.get("trials", 0) + 1  # 重试次数
+
+        email_information = (
+            f"# 客户邮件内容：{current_email.body}\n"
+            f"# 邮件分类：{email_category}\n"
+            f"# RAG检索参考：{rag_queries if rag_queries else '无'}\n"
+        )
+        history_str = "\n".join(history_messages) if history_messages else "无历史沟通记录"
+
+        email_result = self.agents.email_writer_chain().invoke({
+            "email_information": email_information,  
+            "history": history_str 
+        })
+        email_content = email_result.content
+        print(Fore.MAGENTA + f"nodes info: 编写邮件内容: {email_content}" + Style.RESET_ALL)
+        
+        history_messages.append(f"# 第{trials}次编写结果：\n{email_content}")
+
+        return {
+            "generated_email": email_content, 
+            "trials": trials,
+            "writer_messages": history_messages
         }
