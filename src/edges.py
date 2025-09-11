@@ -4,6 +4,17 @@ from colorama import Fore, Style
 
 
 class Edges:
+    def is_email_inbox_empty(self, state: GraphState) -> str:
+        """
+        路由函数，根据收件箱是否为空路由到不同的节点
+        """
+        print(Fore.YELLOW + "Checking if email inbox is empty...\n" + Style.RESET_ALL)
+        if len(state["emails"]) == 0:
+            print(Fore.GREEN + "收件箱为空，没有邮件需要处理" + Style.RESET_ALL)
+            return "True"
+        else:
+            return "False"
+
     def route_email_based_on_category(self, state: GraphState) -> str:
         """
         路由函数，根据邮件分类路由到不同的节点

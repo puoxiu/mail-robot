@@ -39,3 +39,11 @@ class EmailProofreaderOutput(BaseModel):
         ..., 
         description="Indicates whether the email is sendable (true) or not (false)."
     )
+
+
+
+class RAGQueriesOutput(BaseModel):
+    queries: List[str] = Field(
+        ..., 
+        description="A list of up to three questions representing the customer's intent, based on their email."
+    )

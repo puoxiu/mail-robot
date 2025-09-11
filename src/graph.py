@@ -3,11 +3,12 @@ from langgraph.graph import StateGraph,END
 from src.state import GraphState
 from src.nodes import Nodes
 from src.edges import Edges
+from src.rag import RAGEngine
 
 class GraphWorkFlow:
-    def __init__(self, model_name: str, base_url: str, api_key: str):
+    def __init__(self, model_name: str, base_url: str, api_key: str, rag_engine: RAGEngine):
         workflow = StateGraph(GraphState)
-        nodes = Nodes(model_name, base_url, api_key)
+        nodes = Nodes(model_name, base_url, api_key, rag_engine)
         edges = Edges()
 
         workflow.add_node("load_inbox_emails", nodes.load_new_emails)
@@ -15,14 +16,25 @@ class GraphWorkFlow:
         workflow.add_node("categorize_email", nodes.categorize_email)
         
         workflow.add_node("construct_rag_queries", nodes.construct_rag_queries)
+        workflow.add_node("retrieve_from_rag", nodes.retrieve_from_rag)
         workflow.add_node("email_writer", nodes.write_email)
         workflow.add_node("email_proofreader", nodes.verify_generated_email)
         workflow.add_node("send_email", nodes.send_email)
         workflow.add_node("manual_pending", nodes.manual_pending)
+        workflow.add_node("skip_unrelated_email", nodes.skip_unrelated_email)
 
         workflow.set_entry_point("load_inbox_emails")
         workflow.add_edge("load_inbox_emails", "is_email_inbox_empty")
         workflow.add_edge("is_email_inbox_empty", "categorize_email")
+
+        workflow.add_conditional_edges(
+            "is_email_inbox_empty",
+            edges.is_email_inbox_empty,
+            {
+                "True": END,
+                "False": "categorize_email",
+            },
+        )
 
         workflow.add_conditional_edges(
             "categorize_email",
@@ -30,10 +42,11 @@ class GraphWorkFlow:
             {
                 "product related": "construct_rag_queries",
                 "complaint_or_feedback": "email_writer",
-                "unrelated": END,
+                "unrelated": "skip_unrelated_email",
             },
         )
-        workflow.add_edge("construct_rag_queries", "email_writer")
+        workflow.add_edge("construct_rag_queries", "retrieve_from_rag")
+        workflow.add_edge("retrieve_from_rag", "email_writer")
         workflow.add_edge("email_writer", "email_proofreader")
         workflow.add_conditional_edges(
             "email_proofreader",

@@ -1,9 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from langchain_chroma import Chroma
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_openai import ChatOpenAI
 
 from .prompts_zh import (
     CATEGORIZE_EMAIL_PROMPT,
@@ -12,17 +9,18 @@ from .prompts_zh import (
     EMAIL_PROOFREADER_PROMPT,
 )
 from .schema_outputs import CategorizeEmailOutput, RAGQueriesOutput, EmailWriterOutput, EmailProofreaderOutput
+from .llm import get_llm
 
-class Agents:
+class Chains:
     def __init__(self, model_name: str, base_url: str, api_key: str):
-        self.model1 = ChatOpenAI(
-             model=model_name,
+        self.model1 = get_llm(
+             model_name=model_name,
              base_url=base_url,
              api_key=api_key,
              temperature=0,
         )
-        self.model2 = ChatOpenAI(
-             model=model_name,
+        self.model2 = get_llm(
+             model_name=model_name,
              base_url=base_url,
              api_key=api_key,
              temperature=0.7,
@@ -58,3 +56,7 @@ class Agents:
             input_variables=["initial_email", "generated_email"],
         )
         return proofreader_prompt | self.model2.with_structured_output(EmailProofreaderOutput)
+    
+
+    def rag_answer_chain(self) -> RunnablePassthrough:
+        pass

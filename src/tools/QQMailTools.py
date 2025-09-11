@@ -33,7 +33,6 @@ class EmailStatus(Enum):
         """快速获取状态值（可选，避免记混元组顺序）"""
         return self.value[0]
 
-
 class QQMailTools:
     def __init__(self):
         self.email_from = os.getenv("EMAIL_FROM")

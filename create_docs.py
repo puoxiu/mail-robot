@@ -1,15 +1,13 @@
-
+# create_index.py
+import os
 from dotenv import load_dotenv
 load_dotenv()
-
-import os
-import sys
-from colorama import Fore, Style
-from src.graph import GraphWorkFlow
-
-from src.utils.redis_utils import redis_conn
 from src.utils.database import MySQLManager
 from src.rag import RAGEngine
+from langchain_openai import ChatOpenAI
+from src.llm import get_llm
+from colorama import Fore, Style
+
 
 print(Fore.BLUE +f"============================================================================")
 print(f"===============================加载环境变量=================================")
@@ -18,6 +16,7 @@ print(f"BASE_URL: {os.getenv('BASE_URL')}")
 print(f"MODEL_NAME: {os.getenv('MODEL_NAME')}")
 print(f"EMBEDDING_MODEL_NAME: {os.getenv('EMBEDDING_MODEL_NAME')}")
 print(f"EMBEDDING_API_KEY: {os.getenv('EMBEDDING_API_KEY')}")
+print(f"DASHSCOPE_API_KEY: {os.getenv('DASHSCOPE_API_KEY')}")
 print(f"EMAIL_FROM: {os.getenv('EMAIL_FROM')}")
 print(f"SMTP_HOST: {os.getenv('SMTP_HOST')}")
 print(f"SMTP_PORT: {os.getenv('SMTP_PORT')}")
@@ -32,52 +31,30 @@ print(f"========================================================================
 
 print(Fore.GREEN + "Starting workflow..." + Style.RESET_ALL)
 
-
-
-# 检查 Redis
-if not redis_conn:
-    print(f"{Fore.RED}❌ Redis 初始化失败，程序终止{Style.RESET_ALL}")
-    sys.exit(1)
-else:
-    print(f"{Fore.GREEN}✅ Redis 连接成功{Style.RESET_ALL}")
-
-
-
-config = {'recursion_limit': 100}
-initial_state = {
-    "emails": [],
-    "current_email": {
-      "id": "",
-      "threadId": "",
-      "messageId": "",
-      "references": "",
-      "sender": "",
-      "subject": "",
-      "body": ""
-    },
-    "email_category": "",
-    "generated_email": "",
-    "rag_queries": [],
-    "retrieved_documents": "",
-    "writer_messages": [],
-    "sendable": False,
-    "trials": 0
-}
-
-
+def load_documents_from_dir(data_dir: str):
+    """加载目录下的所有文本文件"""
+    docs = []
+    for file in os.listdir(data_dir):
+        path = os.path.join(data_dir, file)
+        if os.path.isfile(path) and file.endswith(".txt"):
+            with open(path, "r", encoding="utf-8") as f:
+                docs.append((file, f.read()))
+    return docs
 
 
 def main():
-    db_manager = MySQLManager(
-            host=os.getenv("MYSQL_HOST", "localhost"),  # 从环境变量读，默认本地
-            port=int(os.getenv("MYSQL_PORT", 3306)),    # 默认 MySQL 端口
-            user=os.getenv("MYSQL_USER", "root"),       # 你的 MySQL 用户名
-            password=os.getenv("MYSQL_PASSWORD", ""),   # 你的 MySQL 密码
-            db_name="rag_hyde"                          # 目标数据库（已创建的 rag_hyde）
-        )
-    
+    # 1. 初始化 MySQL 管理器
+    db = MySQLManager(
+        host=os.getenv("MYSQL_HOST"),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        port=int(os.getenv("MYSQL_PORT")),
+        database=os.getenv("MYSQL_DATABASE")
+    )
+
+    # 2. 初始化 RAG 引擎
     rag_engine = RAGEngine(
-        db_manager=db_manager,
+        db_manager=db,
         embedding_model_name=os.getenv("EMBEDDING_MODEL_NAME"),
         api_key=os.getenv("DASHSCOPE_API_KEY"),
         base_url=os.getenv("BASE_URL"),
@@ -89,17 +66,24 @@ def main():
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP")),
     )
 
-    graph = GraphWorkFlow(
-        model_name=os.getenv('MODEL_NAME'),
-        base_url=os.getenv('BASE_URL'),
-        api_key=os.getenv('OPENAI_API_KEY'),
-        rag_engine=rag_engine,
+    # 3. 初始化 LLM（生成 HyDE 问题）
+    llm = get_llm(
+        model_name=os.getenv("MODEL_NAME"),
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url=os.getenv("BASE_URL"),
     )
-    graph.display(path="./graph_png/graph_load_emails.png")
 
-    for output in graph.graph.stream(initial_state, config):
-        for key, value in output.items():
-            print(Fore.CYAN + f"Finished running: {key}:" + Style.RESET_ALL)
+    # 4. 加载文档
+    docs = load_documents_from_dir(os.getenv("DATA_DIR"))
+
+    # 5. 处理并存储
+    for file_name, content in docs:
+        chunk_count, question_count = rag_engine.process_document(
+            document_content=content,
+            source=file_name,
+            llm=llm
+        )
+        print(f"✅ {file_name} 已处理: {chunk_count} chunks, {question_count} hyde questions")
 
 
 if __name__ == "__main__":

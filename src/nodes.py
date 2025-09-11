@@ -3,12 +3,15 @@ from colorama import Fore, Style
 
 from .tools.QQMailTools import QQMailTools
 from .state import GraphState, Email
-from .agents import Agents
+from .chains import Chains
+from src.rag import RAGEngine
+
 
 class Nodes:
-    def __init__(self, model_name: str, base_url: str, api_key: str):
+    def __init__(self, model_name: str, base_url: str, api_key: str, rag_engine: RAGEngine):
         self.qq_mail_tools = QQMailTools()
-        self.agents = Agents(model_name, base_url, api_key)
+        self.chains = Chains(model_name, base_url, api_key)
+        self.rag_engine = rag_engine
 
     # 定义节点
     def load_new_emails(self, state: GraphState) -> GraphState:
@@ -29,11 +32,11 @@ class Nodes:
 
     def categorize_email(self, state: GraphState) -> GraphState:
         """
-        调用分类agent对邮件进行分类
+        调用分类chain对邮件进行分类
         """
         print(Fore.BLUE + "正在分类邮件...\n" + Style.RESET_ALL)
         current_email = state["emails"][-1] 
-        result = self.agents.categorize_email_chain().invoke({"email_content": current_email.body})
+        result = self.chains.categorize_email_chain().invoke({"email_content": current_email.body})
         print(Fore.MAGENTA + f"nodes info: 分类结果Email category: {result.category.value}" + Style.RESET_ALL)
 
         return {
@@ -48,7 +51,7 @@ class Nodes:
         """
         print(Fore.BLUE + "正在构造RAG查询...\n" + Style.RESET_ALL)
         email_content = state["current_email"].body
-        query_result = self.agents.design_rag_queries_chain().invoke({"email_content": email_content})
+        query_result = self.chains.design_rag_queries_chain().invoke({"email_content": email_content})
 
         for query in query_result.queries:
             print(Fore.MAGENTA + f"nodes info: 构造RAG查询: {query}" + Style.RESET_ALL)
@@ -60,7 +63,7 @@ class Nodes:
     
     def write_email(self, state: GraphState) -> GraphState:
         """
-        调用邮件agent编写邮件
+        调用邮件chain编写邮件
         """
         print(Fore.BLUE + "正在编写邮件...\n" + Style.RESET_ALL)
 
@@ -78,7 +81,7 @@ class Nodes:
         )
         history_str = "\n".join(history_messages) if history_messages else "无历史沟通记录"
 
-        email_result = self.agents.email_writer_chain().invoke({
+        email_result = self.chains.email_writer_chain().invoke({
             "email_information": email_information,  
             "history": history_str 
         })
@@ -96,10 +99,10 @@ class Nodes:
 
     def verify_generated_email(self, state: GraphState) -> GraphState:
         """
-        调用邮件agent校对邮件
+        调用邮件chain校对邮件
         """
         print(Fore.BLUE + "正在校对邮件...\n" + Style.RESET_ALL)
-        review = self.agents.email_proofreader_chain().invoke({
+        review = self.chains.email_proofreader_chain().invoke({
             "initial_email": state["current_email"].body,
             "generated_email": state["generated_email"],
         })
@@ -125,7 +128,6 @@ class Nodes:
         )
         return {"retrieved_documents": "", "trials": 0}
     
-
     def manual_pending(self, state: GraphState) -> GraphState:
         """
         手动处理邮件
@@ -133,3 +135,46 @@ class Nodes:
         print(Fore.BLUE + "正在手动处理邮件...\n" + Style.RESET_ALL)
         print(Fore.MAGENTA + f"{state}" + Style.RESET_ALL)
         return state
+    
+    def skip_unrelated_email(self, state: GraphState) -> GraphState:
+        """
+        跳过无关邮件(垃圾、广告邮件等)
+        """
+        print(Fore.BLUE + "正在跳过无关邮件...\n" + Style.RESET_ALL)
+        print(Fore.MAGENTA + f"nodes info: 邮件内容: {state['current_email']}" + Style.RESET_ALL)
+        state["emails"].pop()
+        return state    
+    
+    def retrieve_from_rag(self, state: GraphState) -> GraphState:
+        """
+        从RAG中检索文档
+        """
+        print(Fore.BLUE + "正在从RAG中检索文档...\n" + Style.RESET_ALL)
+        
+        rag_queries = state.get("rag_queries", [])
+        if not rag_queries:
+            print(Fore.YELLOW + "警告：未获取到 RAG 查询，检索跳过" + Style.RESET_ALL)
+            return {"retrieved_documents": "未提供有效查询，无检索结果", "retrieval_details": []}
+        
+        # 检索
+        # 1. 直接检索
+        direct_results = self.rag_engine.retrieve_direct(
+            queries=rag_queries
+        )
+        # 2. HyDE检索
+        hyde_results = self.rag_engine.retrieve_hyde(
+            queries=rag_queries
+        )
+        # 3. 合并检索结果
+        all_results = self.rag_engine.merge_and_rerank(
+            direct_results=direct_results,
+            hyde_results=hyde_results,
+        )
+        
+
+        final_answer = ""
+        for query in state["rag_queries"]:
+            rag_result = self.agents.generate_rag_answer.invoke(query)
+            final_answer += query + "\n" + rag_result + "\n\n"
+        
+        return {"retrieved_documents": final_answer}
