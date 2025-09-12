@@ -26,6 +26,15 @@ print(f"EMAIL_PASSWORD: {os.getenv('EMAIL_PASSWORD')}")
 print(f"EMAIL_DELAY_HOURS: {os.getenv('EMAIL_DELAY_HOURS')}")
 print(f"IMAP_HOST: {os.getenv('IMAP_HOST')}")
 print(f"IMAP_PORT: {os.getenv('IMAP_PORT')}")
+print(f"REDIS_HOST: {os.getenv('REDIS_HOST')}")
+print(f"REDIS_PORT: {os.getenv('REDIS_PORT')}")
+print(f"REDIS_DB: {os.getenv('REDIS_DB')}")
+print(f"REDIS_PASSWORD: {os.getenv('REDIS_PASSWORD')}")
+print(f"MYSQL_HOST: {os.getenv('MYSQL_HOST')}")
+print(f"MYSQL_PORT: {os.getenv('MYSQL_PORT')}")
+print(f"MYSQL_USER: {os.getenv('MYSQL_USER')}")
+print(f"MYSQL_PASSWORD: {os.getenv('MYSQL_PASSWORD')}")
+print(f"MYSQL_DB_NAME: {os.getenv('MYSQL_DB_NAME')}")
 
 print(f"=============================================================================")
 print(f"=============================================================================")
@@ -73,7 +82,7 @@ def main():
             port=int(os.getenv("MYSQL_PORT", 3306)),    # 默认 MySQL 端口
             user=os.getenv("MYSQL_USER", "root"),       # 你的 MySQL 用户名
             password=os.getenv("MYSQL_PASSWORD", ""),   # 你的 MySQL 密码
-            db_name="rag_hyde"                          # 目标数据库（已创建的 rag_hyde）
+            db_name=os.getenv("MYSQL_DB_NAME", "rag_hyde")                          # 目标数据库（已创建的 rag_hyde）
         )
     
     rag_engine = RAGEngine(

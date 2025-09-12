@@ -166,15 +166,30 @@ class Nodes:
             queries=rag_queries
         )
         # 3. 合并检索结果
-        all_results = self.rag_engine.merge_and_rerank(
+        merged_results = self.rag_engine.merge_and_rerank(
             direct_results=direct_results,
             hyde_results=hyde_results,
         )
         
+        # 4. 生成最终答案
+        retrieved_str = ""
+        retrieval_details = []  # 存储详细信息（用于调试）
+        if merged_results:
+            retrieved_str += f"找到 {len(merged_results)} 个相关参考信息：\n\n"
+            for idx, doc in enumerate(merged_results, 1):
+                # 只保留来源和内容（HyDE检索时补充匹配的问题）
+                source = doc.get("source", "未知来源")
+                content = doc.get("content", "无内容")
+                matching_question = doc.get("matching_question", "")  # 仅HyDE有
+                
+                # 简化格式
+                retrieved_str += f"{idx}. 来源：{source}\n"
+                if matching_question:  # 若有匹配问题，简要说明
+                    retrieved_str += f"（相关问题：{matching_question}）\n"
+                retrieved_str += f"内容：{content}\n\n"
+        else:
+            retrieved_str = "未找到相关参考信息"
 
-        final_answer = ""
-        for query in state["rag_queries"]:
-            rag_result = self.agents.generate_rag_answer.invoke(query)
-            final_answer += query + "\n" + rag_result + "\n\n"
+        print(Fore.MAGENTA + f"\n\nnodes info: RAG 检索结果：\n{retrieved_str}\n\n" + Style.RESET_ALL)
         
-        return {"retrieved_documents": final_answer}
+        return {"retrieved_documents": retrieved_str}

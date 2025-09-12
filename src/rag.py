@@ -257,10 +257,11 @@ class RAGEngine:
         self, 
         direct_results: List[Dict], 
         hyde_results: List[Dict], 
-        query: str,
+        query: str = "",
         top_n: int = 8,
         score_threshold: float = 0.5
     ) -> List[Dict]:
+        # 暂时仅仅合并，不进行 rerank
         """合并 direct + HyDE 检索结果，并去重 + 排序"""
         chunk_map = {}
         for result in direct_results + hyde_results:

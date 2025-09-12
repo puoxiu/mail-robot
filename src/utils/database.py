@@ -12,14 +12,14 @@ class MySQLManager:
         user: str,
         port: int,
         password: str = "",
-        database: str = "rag_hyde",
+        db_name: str = "rag_hyde",
     ):
         """初始化MySQL连接管理器"""
         self.host = host
         self.user = user
         self.port = port
         self.password = password
-        self.database = database
+        self.db_name = db_name
         self.conn: Optional[MySQLConnection] = None
         self._init_connection()
         self._init_tables()  # 确保表结构存在
@@ -32,10 +32,10 @@ class MySQLManager:
                 user=self.user,
                 port=self.port,
                 password=self.password,
-                database=self.database
+                database=self.db_name,
             )
             if self.conn.is_connected():
-                print(f"成功连接到MySQL数据库: {self.database}")
+                print(f"成功连接到MySQL数据库: {self.db_name}")
         except Exception as e:
             print(f"MySQL连接失败: {str(e)}")
             raise
