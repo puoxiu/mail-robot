@@ -35,14 +35,18 @@ class Edges:
         email_sendable = state["sendable"]
         if email_sendable:
             print(Fore.GREEN + "不需要重写，直接发送" + Style.RESET_ALL)
-            state["emails"].pop()
             state["writer_messages"] = []
             return "send"
         elif state["trials"] >= 3:
             print(Fore.RED + "超过最大重试次数，必须停止" + Style.RESET_ALL)
-            state["emails"].pop()
             state["writer_messages"] = []
             return "stop"
         else:
             print(Fore.RED + "需要重写" + Style.RESET_ALL)
             return "rewrite"
+    
+    def has_more_emails(self, state: GraphState) -> str:
+        """判断是否有更多邮件需要处理"""
+        if state['has_more'] == True:
+            return "True"
+        return "False"

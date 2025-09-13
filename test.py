@@ -1,3 +1,6 @@
+from src.in_graph import GraphWorkFlow
+
+
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -5,7 +8,6 @@ load_dotenv()
 import os
 import sys
 from colorama import Fore, Style
-from src.graph import GraphWorkFlow
 
 from src.utils.redis_utils import redis_conn
 from src.utils.database import MySQLManager
@@ -55,8 +57,6 @@ else:
 config = {'recursion_limit': 100}
 initial_state = {
     "emails": [],
-    "current_email_index": 0,
-    "has_more": True,
     "current_email": {
       "id": "",
       "threadId": "",
@@ -106,11 +106,7 @@ def main():
         api_key=os.getenv('OPENAI_API_KEY'),
         rag_engine=rag_engine,
     )
-    graph.display(path="./graph_png/graph_load_emails.png")
-
-    for output in graph.graph.stream(initial_state, config):
-        for key, value in output.items():
-            print(Fore.CYAN + f"Finished running: {key}:" + Style.RESET_ALL)
+    graph.display(path="./graph_png/in_graph_load_emails.png")
 
 
 if __name__ == "__main__":

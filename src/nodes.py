@@ -1,5 +1,7 @@
 from colorama import Fore, Style
-
+from typing import Dict, Any
+from time import sleep
+from langchain.schema import HumanMessage, AIMessage
 
 from .tools.QQMailTools import QQMailTools
 from .state import GraphState, Email
@@ -29,19 +31,48 @@ class Nodes:
         """
         return state
     
+    
+    def check_more_emails(self, state: GraphState) -> Dict[str, Any]:
+        """检查是否有更多邮件需要处理"""
+        current_index = state["current_email_index"]
+        total_emails = len(state["emails"])
+        has_more = current_index < total_emails
+        print(Fore.CYAN + f"🔍 check_more_emails：当前索引={current_index}，总邮件数={total_emails}，是否有更多={has_more}" + Style.RESET_ALL)
+        return {**state, "has_more": has_more}
+    
+
+
+    def get_next_email(self, state: GraphState) -> GraphState:
+        """进入此节点，必定有更多邮件需要处理，获取下一封邮件进行处理"""
+        index = state["current_email_index"]
+        next_index = index + 1
+
+        return {
+            **state,
+            # 重置当前邮件相关的状态
+            "current_email": state["emails"][index],
+            "current_email_index": next_index,
+            "email_category": "",
+            "generated_email": "",
+            "rag_queries": [],
+            "retrieved_documents": "",
+            "writer_messages": [],
+            "sendable": False,
+            "trials": 0
+        }
 
     def categorize_email(self, state: GraphState) -> GraphState:
         """
         调用分类chain对邮件进行分类
         """
         print(Fore.BLUE + "正在分类邮件...\n" + Style.RESET_ALL)
-        current_email = state["emails"][-1] 
+        current_email = state["current_email"]
         result = self.chains.categorize_email_chain().invoke({"email_content": current_email.body})
         print(Fore.MAGENTA + f"nodes info: 分类结果Email category: {result.category.value}" + Style.RESET_ALL)
 
         return {
+            **state,
             "email_category": result.category.value,
-            "current_email": current_email
         }
     
 
@@ -57,6 +88,7 @@ class Nodes:
             print(Fore.MAGENTA + f"nodes info: 构造RAG查询: {query}" + Style.RESET_ALL)
         
         return {
+            **state,
             "rag_queries": query_result.queries
         }
         
@@ -74,12 +106,21 @@ class Nodes:
         history_messages = state.get("writer_messages", [])  # 历史编写记录
         trials = state.get("trials", 0) + 1  # 重试次数
 
+
+        #  构造提示词（优化：从 Message 对象提取 content，避免字符串拼接错误）
+        history_str_list = []
+        for msg in history_messages:
+            if isinstance(msg, HumanMessage):
+                history_str_list.append(f"用户：{msg.content}")
+            elif isinstance(msg, AIMessage):
+                history_str_list.append(f"AI：{msg.content}")
+        history_str = "\n".join(history_str_list) if history_str_list else "无历史沟通记录"
+
         email_information = (
             f"# 客户邮件内容：{current_email.body}\n"
             f"# 邮件分类：{email_category}\n"
             f"# RAG检索参考：{rag_queries if rag_queries else '无'}\n"
         )
-        history_str = "\n".join(history_messages) if history_messages else "无历史沟通记录"
 
         email_result = self.chains.email_writer_chain().invoke({
             "email_information": email_information,  
@@ -88,12 +129,17 @@ class Nodes:
         email_content = email_result.content
         print(Fore.MAGENTA + f"nodes info: 编写邮件内容: {email_content}" + Style.RESET_ALL)
         
-        history_messages.append(f"# 第{trials}次编写结果：\n{email_content}")
+        # 4. 关键：追加 Message 对象（而非字符串），统一类型
+        updated_history = history_messages + [
+            HumanMessage(content=f"第{trials}次编写的输入信息：{email_information}"),
+            AIMessage(content=f"第{trials}次编写结果：{email_content}")
+        ]
 
         return {
+            **state,
             "generated_email": email_content, 
             "trials": trials,
-            "writer_messages": history_messages
+            "writer_messages": updated_history
         }
     
 
@@ -110,11 +156,11 @@ class Nodes:
         writer_messages.append(f"# 校对结果：\n{review.reason}")
 
         return {
+            **state,
             "sendable": review.sendable,
             "writer_messages": writer_messages
         }
     
-
     def send_email(self, state: GraphState) -> GraphState:
         """
         发送邮件
@@ -126,7 +172,11 @@ class Nodes:
             state["current_email"],
             state["generated_email"]
         )
-        return {"retrieved_documents": "", "trials": 0}
+        return {
+            **state,
+            "retrieved_documents": "",  # 重置RAG检索结果（避免影响下一封邮件）
+            "trials": 0  # 重置重试次数（避免下一封邮件继承重试计数）
+        }
     
     def manual_pending(self, state: GraphState) -> GraphState:
         """
@@ -142,7 +192,12 @@ class Nodes:
         """
         print(Fore.BLUE + "正在跳过无关邮件...\n" + Style.RESET_ALL)
         print(Fore.MAGENTA + f"nodes info: 邮件内容: {state['current_email']}" + Style.RESET_ALL)
-        state["emails"].pop()
+        current_email_idx = state["current_email_index"] - 1
+        if 0 <= current_email_idx < len(state["emails"]):
+            state["emails"].pop(current_email_idx)  # 删除当前处理的邮件
+        else:
+            print(Fore.YELLOW + f"警告：无效的邮件索引 {current_email_idx}，跳过删除" + Style.RESET_ALL)
+        
         return state    
     
     def retrieve_from_rag(self, state: GraphState) -> GraphState:
@@ -192,4 +247,22 @@ class Nodes:
 
         print(Fore.MAGENTA + f"\n\nnodes info: RAG 检索结果：\n{retrieved_str}\n\n" + Style.RESET_ALL)
         
-        return {"retrieved_documents": retrieved_str}
+        return {
+            **state,
+            "retrieved_documents": retrieved_str
+        }
+
+
+    def wait_for_next_check(self, state: GraphState) -> Dict[str, Any]:
+        """等待一段时间后再检查新邮件"""
+        # 从环境变量获取等待时间，默认为1小时
+        wait_hours = 1
+        print(f"所有邮件处理完毕，将在{wait_hours}小时后再次检查新邮件...")
+        sleep(wait_hours * 3600) 
+        return {
+            **state,
+            "emails": [],  # 清空旧邮件列表
+            "current_email_index": 0,  # 重置索引为0
+            "has_more": False,  # 重置为“无更多邮件”
+            "current_email": None  # 清空当前邮件
+        }

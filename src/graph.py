@@ -13,6 +13,9 @@ class GraphWorkFlow:
 
         workflow.add_node("load_inbox_emails", nodes.load_new_emails)
         workflow.add_node("is_email_inbox_empty", nodes.is_email_inbox_empty)   # todo
+        workflow.add_node("check_more_emails", nodes.check_more_emails)  # 检查是否有更多邮件
+
+        workflow.add_node("get_next_email", nodes.get_next_email)  # 获取下一封邮件
         workflow.add_node("categorize_email", nodes.categorize_email)
         
         workflow.add_node("construct_rag_queries", nodes.construct_rag_queries)
@@ -22,19 +25,22 @@ class GraphWorkFlow:
         workflow.add_node("send_email", nodes.send_email)
         workflow.add_node("manual_pending", nodes.manual_pending)
         workflow.add_node("skip_unrelated_email", nodes.skip_unrelated_email)
+        workflow.add_node("wait_for_next_check", nodes.wait_for_next_check)
 
         workflow.set_entry_point("load_inbox_emails")
         workflow.add_edge("load_inbox_emails", "is_email_inbox_empty")
-        workflow.add_edge("is_email_inbox_empty", "categorize_email")
+        workflow.add_edge("is_email_inbox_empty", "check_more_emails")
 
         workflow.add_conditional_edges(
-            "is_email_inbox_empty",
-            edges.is_email_inbox_empty,
+            "check_more_emails",
+            edges.has_more_emails,
             {
-                "True": END,
-                "False": "categorize_email",
+                "True": "get_next_email",
+                "False": "wait_for_next_check",
             },
         )
+
+        workflow.add_edge("get_next_email", "categorize_email")
 
         workflow.add_conditional_edges(
             "categorize_email",
@@ -57,10 +63,15 @@ class GraphWorkFlow:
                 "stop": "manual_pending"
             },
         )
+        # 各种处理结束后检查是否有更多邮件
+        workflow.add_edge("send_email", "check_more_emails")
+        workflow.add_edge("manual_pending", "check_more_emails")
+        workflow.add_edge("skip_unrelated_email", "check_more_emails")
+    
 
-
-        workflow.add_edge("email_writer", END)
-
+        # 等待一段时间后重新检查邮箱
+        workflow.add_edge("wait_for_next_check", "load_inbox_emails")
+        # workflow.add_edge("email_writer", END)
 
         self.graph = workflow.compile()
 
