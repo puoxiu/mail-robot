@@ -1,17 +1,16 @@
-# docker-compose.yml（开发环境专用，无持久化）
 version: '3.8'
 
 services:
   redis:
-    image: redis:latest  # 最新稳定版 Redis
-    container_name: mail-robot-redis-dev  # 加 dev 后缀，区分开发/生产容器
-    restart: on-failure  # 仅容器故障时重启（开发阶段无需开机自启）
+    image: redis:latest  
+    container_name: mail-robot-redis-dev
+    restart: on-failure 
     ports:
-      - "6379:6379"  # 端口映射不变，确保和 QQMailTools 配置一致
+      - "6379:6379" 
     environment:
-      - REDIS_PASSWORD=  # 开发阶段无需密码，保持和代码配置一致
-    # 关键：不挂载数据卷，不开启 AOF 持久化（用默认的内存存储）
-    command: redis-server --appendonly no  # 关闭 AOF 持久化
+      - REDIS_PASSWORD=  
+
+    command: redis-server --appendonly no
 
   mysql:
     image: mysql:8.0
@@ -20,7 +19,18 @@ services:
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: "root"      # 开发环境不设密码
-      MYSQL_DATABASE: rag_hyde     # 初始化数据库
+      MYSQL_ROOT_PASSWORD: "root" 
+      MYSQL_DATABASE: rag_hyde 
     command: --default-authentication-plugin=mysql_native_password
     # 不挂载数据卷，容器销毁后数据丢弃（开发环境用）
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: mail-robot-rabbitmq-dev
+    restart: on-failure
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"

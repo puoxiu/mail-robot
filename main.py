@@ -10,6 +10,8 @@ from src.graph import GraphWorkFlow
 from src.utils.redis_utils import redis_conn
 from src.utils.database import MySQLManager
 from src.rag import RAGEngine
+from src.utils.rabbitmq import MQClient
+
 
 print(Fore.BLUE +f"============================================================================")
 print(f"===============================加载环境变量=================================")
@@ -76,16 +78,19 @@ initial_state = {
 }
 
 
-
-
 def main():
     db_manager = MySQLManager(
-            host=os.getenv("MYSQL_HOST", "localhost"),  # 从环境变量读，默认本地
-            port=int(os.getenv("MYSQL_PORT", 3306)),    # 默认 MySQL 端口
-            user=os.getenv("MYSQL_USER", "root"),       # 你的 MySQL 用户名
-            password=os.getenv("MYSQL_PASSWORD", ""),   # 你的 MySQL 密码
-            db_name=os.getenv("MYSQL_DB_NAME", "rag_hyde")                          # 目标数据库（已创建的 rag_hyde）
+            host=os.getenv("MYSQL_HOST", ),
+            port=int(os.getenv("MYSQL_PORT")),
+            user=os.getenv("MYSQL_USER"),
+            password=os.getenv("MYSQL_PASSWORD", ""),
+            db_name=os.getenv("MYSQL_DB_NAME")
         )
+    
+    mq_client = MQClient(
+        host=os.getenv("RABBITMQ_HOST"),
+        queue_name=os.getenv("RABBITMQ_QUEUE_NAME"),
+    )
     
     rag_engine = RAGEngine(
         db_manager=db_manager,
@@ -105,6 +110,7 @@ def main():
         base_url=os.getenv('BASE_URL'),
         api_key=os.getenv('OPENAI_API_KEY'),
         rag_engine=rag_engine,
+        mq_client=mq_client,
     )
     graph.display(path="./graph_png/graph_load_emails.png")
 

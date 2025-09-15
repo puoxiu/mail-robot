@@ -4,11 +4,12 @@ from src.state import GraphState
 from src.nodes import Nodes
 from src.edges import Edges
 from src.rag import RAGEngine
+from src.utils.rabbitmq import MQClient
 
 class GraphWorkFlow:
-    def __init__(self, model_name: str, base_url: str, api_key: str, rag_engine: RAGEngine):
+    def __init__(self, model_name: str, base_url: str, api_key: str, rag_engine: RAGEngine, mq_client: MQClient):
         workflow = StateGraph(GraphState)
-        nodes = Nodes(model_name, base_url, api_key, rag_engine)
+        nodes = Nodes(model_name, base_url, api_key, rag_engine, mq_client)
         edges = Edges()
 
         workflow.add_node("load_inbox_emails", nodes.load_new_emails)

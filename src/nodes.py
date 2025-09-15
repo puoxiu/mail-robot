@@ -2,18 +2,21 @@ from colorama import Fore, Style
 from typing import Dict, Any
 from time import sleep
 from langchain.schema import HumanMessage, AIMessage
+from datetime import datetime
 
 from .tools.QQMailTools import QQMailTools
 from .state import GraphState, Email
 from .chains import Chains
 from src.rag import RAGEngine
+from src.utils.rabbitmq import MQClient
 
 
 class Nodes:
-    def __init__(self, model_name: str, base_url: str, api_key: str, rag_engine: RAGEngine):
+    def __init__(self, model_name: str, base_url: str, api_key: str, rag_engine: RAGEngine, mq_client: MQClient):
         self.qq_mail_tools = QQMailTools()
         self.chains = Chains(model_name, base_url, api_key)
         self.rag_engine = rag_engine
+        self.mq_client = mq_client
 
     # 定义节点
     def load_new_emails(self, state: GraphState) -> GraphState:
@@ -184,6 +187,22 @@ class Nodes:
         """
         print(Fore.BLUE + "正在手动处理邮件...\n" + Style.RESET_ALL)
         print(Fore.MAGENTA + f"{state}" + Style.RESET_ALL)
+        
+        current_email = state["current_email"]
+        task_data = {
+            "email_id": current_email.id,
+            "thread_id": current_email.threadId,
+            "sender": current_email.sender,
+            "subject": current_email.subject,
+            "body": current_email.body,
+            "category": state["email_category"],
+            "created_at": datetime.now().isoformat(),
+            "status": "pending"
+        }
+        self.mq_client.publish_task(task_data)
+
+        # todo : 更新redis状态
+        
         return state
     
     def skip_unrelated_email(self, state: GraphState) -> GraphState:
