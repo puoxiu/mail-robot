@@ -10,7 +10,7 @@
 
 ## 系统架构图
 <p align="center">
-  <img src="graph_png/graph_load_emails.png" alt="系统架构图" width="70%">
+  <img src="graph_png/graph_load_emails.png" alt="系统架构图" width="50%">
 </p>
 
 ## 快速开始
