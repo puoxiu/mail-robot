@@ -9,9 +9,9 @@
 - **可扩展架构**：模块化设计，支持新增邮件类型、调整回复规则，兼容多种 LLM 模型。
 
 ## 系统架构图
-![系统架构图](graph_png/graph_load_emails.png)
-
-
+<p align="center">
+  <img src="graph_png/graph_load_emails.png" alt="系统架构图" width="70%">
+</p>
 
 ## 快速开始
 1. 克隆项目到本地
