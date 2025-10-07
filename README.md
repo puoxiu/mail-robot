@@ -48,7 +48,7 @@ python main.py
 
 
 ## 目录结构
-
+```bash
 mail-robot/
 ├── src/
 │   ├── chains.py        # LLM链定义（分类、生成、校对）
@@ -63,3 +63,4 @@ mail-robot/
 ├── create_docs.py       # 初始化知识库脚本
 ├── main.py              # 主程序入口
 └── test_mail.py         # 邮件功能测试脚本
+```
